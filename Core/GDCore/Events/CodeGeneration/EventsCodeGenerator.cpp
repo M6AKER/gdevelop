@@ -329,7 +329,7 @@ gd::String EventsCodeGenerator::GenerateConditionCode(
 
         // Prepare arguments and generate the condition whole code
         vector<gd::String> arguments = GenerateParametersCodes(
-            condition.GetParameters(), instrInfos.parameters, context);
+            condition.GetParameters(), instrInfos.parameters, context, [this, &condition](){return gd::String::From(GenerateSingleUsageUniqueIdFor(&condition));});
         conditionCode += GenerateObjectCondition(realObjects[i],
                                                  objInfo,
                                                  arguments,
@@ -360,7 +360,7 @@ gd::String EventsCodeGenerator::GenerateConditionCode(
 
         // Prepare arguments and generate the whole condition code
         vector<gd::String> arguments = GenerateParametersCodes(
-            condition.GetParameters(), instrInfos.parameters, context);
+            condition.GetParameters(), instrInfos.parameters, context, [this, &condition](){return gd::String::From(GenerateSingleUsageUniqueIdFor(&condition));});
         conditionCode += GenerateBehaviorCondition(
             realObjects[i],
             condition.GetParameter(1).GetPlainString(),
@@ -383,6 +383,7 @@ gd::String EventsCodeGenerator::GenerateConditionCode(
         GenerateParametersCodes(condition.GetParameters(),
                                 instrInfos.parameters,
                                 context,
+                                [this, &condition](){return gd::String::From(GenerateSingleUsageUniqueIdFor(&condition));},
                                 &supplementaryParametersTypes);
 
     conditionCode += GenerateFreeCondition(
@@ -498,7 +499,7 @@ gd::String EventsCodeGenerator::GenerateActionCode(
 
         // Prepare arguments and generate the whole action code
         vector<gd::String> arguments = GenerateParametersCodes(
-            action.GetParameters(), instrInfos.parameters, context);
+            action.GetParameters(), instrInfos.parameters, context, [this, &action](){return gd::String::From(GenerateSingleUsageUniqueIdFor(&action));});
         actionCode += GenerateObjectAction(
             realObjects[i], objInfo, arguments, instrInfos, context);
 
@@ -525,7 +526,7 @@ gd::String EventsCodeGenerator::GenerateActionCode(
 
         // Prepare arguments and generate the whole action code
         vector<gd::String> arguments = GenerateParametersCodes(
-            action.GetParameters(), instrInfos.parameters, context);
+            action.GetParameters(), instrInfos.parameters, context, [this, &action](){return gd::String::From(GenerateSingleUsageUniqueIdFor(&action));});
         actionCode +=
             GenerateBehaviorAction(realObjects[i],
                                    action.GetParameter(1).GetPlainString(),
@@ -539,7 +540,7 @@ gd::String EventsCodeGenerator::GenerateActionCode(
     }
   } else {
     vector<gd::String> arguments = GenerateParametersCodes(
-        action.GetParameters(), instrInfos.parameters, context);
+        action.GetParameters(), instrInfos.parameters, context, [this, &action](){return gd::String::From(GenerateSingleUsageUniqueIdFor(&action));});
     actionCode += GenerateFreeAction(arguments, instrInfos, context);
   }
 
@@ -568,6 +569,7 @@ gd::String EventsCodeGenerator::GenerateParameterCodes(
     const gd::ParameterMetadata& metadata,
     gd::EventsCodeGenerationContext& context,
     const gd::String& lastObjectName,
+    std::function<gd::String()> uidGenerator,
     std::vector<std::pair<gd::String, gd::String> >*
         supplementaryParametersTypes) {
   gd::String argOutput;
@@ -623,6 +625,9 @@ gd::String EventsCodeGenerator::GenerateParameterCodes(
   // Code only parameter type
   else if (metadata.type == "inlineCode") {
     argOutput += metadata.supplementaryInformation;
+  } else if(metadata.type == "uid") {
+    // GenerateSingleUsageUniqueIdFor would be better, but wouldn't work with expressions.
+    argOutput += ConvertToStringExplicit(uidGenerator());
   } else {
     // Try supplementary types if provided
     if (supplementaryParametersTypes) {
@@ -648,6 +653,7 @@ vector<gd::String> EventsCodeGenerator::GenerateParametersCodes(
     const vector<gd::Expression>& parameters,
     const vector<gd::ParameterMetadata>& parametersInfo,
     EventsCodeGenerationContext& context,
+    std::function<gd::String()> uidGenerator,
     std::vector<std::pair<gd::String, gd::String> >*
         supplementaryParametersTypes) {
   vector<gd::String> arguments;
@@ -655,7 +661,7 @@ vector<gd::String> EventsCodeGenerator::GenerateParametersCodes(
   gd::ParameterMetadataTools::IterateOverParameters(
       parameters,
       parametersInfo,
-      [this, &context, &supplementaryParametersTypes, &arguments](
+      [this, &context, &supplementaryParametersTypes, &arguments, &uidGenerator](
           const gd::ParameterMetadata& parameterMetadata,
           const gd::String& parameterValue,
           const gd::String& lastObjectName) {
@@ -664,6 +670,7 @@ vector<gd::String> EventsCodeGenerator::GenerateParametersCodes(
                                    parameterMetadata,
                                    context,
                                    lastObjectName,
+                                   uidGenerator,
                                    supplementaryParametersTypes);
         arguments.push_back(argOutput);
       });
