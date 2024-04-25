@@ -20,11 +20,27 @@ declare class EmscriptenObject {
 }
 
 export enum Variable_Type {
-  String = 0,
-  Number = 1,
-  Boolean = 2,
-  Structure = 3,
-  Array = 4,
+  Unknown = 0,
+  String = 1,
+  Number = 2,
+  Boolean = 3,
+  Structure = 4,
+  Array = 5,
+}
+
+export enum VariablesContainer_SourceType {
+  Unknown = 0,
+  Global = 1,
+  Scene = 2,
+  Object = 3,
+  Local = 4,
+}
+
+export enum ObjectsContainersList_VariableExistence {
+  DoesNotExist = 0,
+  Exists = 1,
+  GroupIsEmpty = 2,
+  ExistsOnlyOnSomeObjectsOfTheGroup = 3,
 }
 
 export enum ExpressionCompletionDescription_CompletionKind {
@@ -169,7 +185,7 @@ export class EventsVariablesFinder extends EmscriptenObject {
   constructor();
   static findAllGlobalVariables(platform: Platform, project: Project): SetString;
   static findAllLayoutVariables(platform: Platform, project: Project, layout: Layout): SetString;
-  static findAllObjectVariables(platform: Platform, project: Project, layout: Layout, obj: gdObject): SetString;
+  static findAllObjectVariables(platform: Platform, project: Project, layout: Layout, objectName: string): SetString;
 }
 
 export class EventsIdentifiersFinder extends EmscriptenObject {
@@ -233,6 +249,21 @@ export class PairStringVariable extends EmscriptenObject {
   getVariable(): Variable;
 }
 
+export class VariableInstructionSwitcher extends EmscriptenObject {
+  static isSwitchableVariableInstruction(instructionType: string): boolean;
+  static isSwitchableObjectVariableInstruction(instructionType: string): boolean;
+  static getSwitchableVariableInstructionIdentifier(instructionType: string): string;
+  static getSwitchableInstructionVariableType(instructionType: string): Variable_Type;
+  static switchVariableInstructionType(instruction: Instruction, variableType: Variable_Type): void;
+  static getVariableTypeFromParameters(platform: Platform, projectScopedContainers: ProjectScopedContainers, instruction: Instruction): Variable_Type;
+  static switchBetweenUnifiedInstructionIfNeeded(platform: Platform, projectScopedContainers: ProjectScopedContainers, instruction: Instruction): void;
+}
+
+export class ExpressionVariableTypeFinder extends EmscriptenObject {
+  static getVariableType(platform: Platform, projectScopedContainers: ProjectScopedContainers, node: ExpressionNode, objectName: string): Variable_Type;
+  static getArrayVariableType(platform: Platform, projectScopedContainers: ProjectScopedContainers, node: ExpressionNode, objectName: string): Variable_Type;
+}
+
 export class Variable extends EmscriptenObject {
   constructor();
   static isPrimitive(type: Variable_Type): boolean;
@@ -269,6 +300,8 @@ export class Variable extends EmscriptenObject {
 
 export class VariablesContainer extends EmscriptenObject {
   constructor();
+  constructor(sourceType: VariablesContainer_SourceType);
+  getSourceType(): VariablesContainer_SourceType;
   has(name: string): boolean;
   get(name: string): Variable;
   getAt(index: number): Variable;
@@ -292,6 +325,11 @@ export class VariablesContainer extends EmscriptenObject {
 export class VariablesContainersList extends EmscriptenObject {
   static makeNewVariablesContainersListForProjectAndLayout(project: Project, layout: Layout): VariablesContainersList;
   static makeNewEmptyVariablesContainersList(): VariablesContainersList;
+  has(name: string): boolean;
+  get(name: string): Variable;
+  getVariablesContainerFromVariableName(variableName: string): VariablesContainer;
+  getVariablesContainer(index: number): VariablesContainer;
+  getVariablesContainersCount(): number;
 }
 
 export class ObjectGroup extends EmscriptenObject {
@@ -556,11 +594,13 @@ export class ObjectsContainersList extends EmscriptenObject {
   getTypeOfBehavior(name: string, searchInGroups: boolean): string;
   getBehaviorsOfObject(name: string, searchInGroups: boolean): VectorString;
   getTypeOfBehaviorInObjectOrGroup(objectOrGroupName: string, behaviorName: string, searchInGroups: boolean): string;
+  hasObjectOrGroupWithVariableNamed(objectName: string, variableName: string): ObjectsContainersList_VariableExistence;
 }
 
 export class ProjectScopedContainers extends EmscriptenObject {
   static makeNewProjectScopedContainersForProjectAndLayout(project: Project, layout: Layout): ProjectScopedContainers;
   static makeNewProjectScopedContainersFor(globalObjectsContainer: ObjectsContainer, objectsContainer: ObjectsContainer): ProjectScopedContainers;
+  static makeNewProjectScopedContainersWithLocalVariables(projectScopedContainers: ProjectScopedContainers, event: BaseEvent): ProjectScopedContainers;
   addPropertiesContainer(propertiesContainer: PropertiesContainer): ProjectScopedContainers;
   addParameters(parameters: VectorParameterMetadata): ProjectScopedContainers;
   getObjectsContainersList(): ObjectsContainersList;
@@ -1602,6 +1642,9 @@ export class BaseEvent extends EmscriptenObject {
   canHaveSubEvents(): boolean;
   hasSubEvents(): boolean;
   getSubEvents(): EventsList;
+  canHaveVariables(): boolean;
+  hasVariables(): boolean;
+  getVariables(): VariablesContainer;
   isDisabled(): boolean;
   setDisabled(disable: boolean): void;
   isFolded(): boolean;
@@ -1610,88 +1653,36 @@ export class BaseEvent extends EmscriptenObject {
   unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class StandardEvent extends EmscriptenObject {
+export class StandardEvent extends BaseEvent {
   constructor();
   getConditions(): InstructionsList;
   getActions(): InstructionsList;
-  clone(): StandardEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class RepeatEvent extends EmscriptenObject {
+export class RepeatEvent extends BaseEvent {
   constructor();
   getConditions(): InstructionsList;
   getActions(): InstructionsList;
   setRepeatExpression(expr: string): void;
   getRepeatExpression(): string;
-  clone(): RepeatEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class WhileEvent extends EmscriptenObject {
+export class WhileEvent extends BaseEvent {
   constructor();
   getConditions(): InstructionsList;
   getWhileConditions(): InstructionsList;
   getActions(): InstructionsList;
-  clone(): WhileEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class ForEachEvent extends EmscriptenObject {
+export class ForEachEvent extends BaseEvent {
   constructor();
   setObjectToPick(objects: string): void;
   getObjectToPick(): string;
   getConditions(): InstructionsList;
   getActions(): InstructionsList;
-  clone(): ForEachEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class ForEachChildVariableEvent extends EmscriptenObject {
+export class ForEachChildVariableEvent extends BaseEvent {
   constructor();
   getConditions(): InstructionsList;
   getActions(): InstructionsList;
@@ -1701,22 +1692,9 @@ export class ForEachChildVariableEvent extends EmscriptenObject {
   setIterableVariableName(newName: string): void;
   setKeyIteratorVariableName(newName: string): void;
   setValueIteratorVariableName(newName: string): void;
-  clone(): ForEachChildVariableEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class CommentEvent extends EmscriptenObject {
+export class CommentEvent extends BaseEvent {
   constructor();
   getComment(): string;
   setComment(type: string): void;
@@ -1728,22 +1706,9 @@ export class CommentEvent extends EmscriptenObject {
   getTextColorRed(): number;
   getTextColorGreen(): number;
   getTextColorBlue(): number;
-  clone(): CommentEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class GroupEvent extends EmscriptenObject {
+export class GroupEvent extends BaseEvent {
   constructor();
   setName(name: string): void;
   getName(): string;
@@ -1756,22 +1721,9 @@ export class GroupEvent extends EmscriptenObject {
   getCreationParameters(): VectorString;
   getCreationTimestamp(): number;
   setCreationTimestamp(ts: number): void;
-  clone(): GroupEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
-export class LinkEvent extends EmscriptenObject {
+export class LinkEvent extends BaseEvent {
   constructor();
   setTarget(name: string): void;
   getTarget(): string;
@@ -1782,19 +1734,6 @@ export class LinkEvent extends EmscriptenObject {
   setIncludeStartAndEnd(start: number, end: number): void;
   getIncludeStart(): number;
   getIncludeEnd(): number;
-  clone(): LinkEvent;
-  getType(): string;
-  setType(type: string): void;
-  isExecutable(): boolean;
-  canHaveSubEvents(): boolean;
-  hasSubEvents(): boolean;
-  getSubEvents(): EventsList;
-  isDisabled(): boolean;
-  setDisabled(disable: boolean): void;
-  isFolded(): boolean;
-  setFolded(folded: boolean): void;
-  serializeTo(element: SerializerElement): void;
-  unserializeFrom(project: Project, element: SerializerElement): void;
 }
 
 export class EventsRemover extends EmscriptenObject {

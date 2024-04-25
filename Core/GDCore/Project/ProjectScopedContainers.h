@@ -2,6 +2,7 @@
 #include <set>
 
 #include "GDCore/Extensions/Metadata/ParameterMetadataTools.h"
+#include "GDCore/Events/Event.h"
 #include "ObjectsContainersList.h"
 #include "PropertiesContainersList.h"
 #include "VariablesContainersList.h"
@@ -61,7 +62,14 @@ class ProjectScopedContainers {
         PropertiesContainersList::MakeNewEmptyPropertiesContainersList());
 
     return projectScopedContainers;
-  }
+  };
+
+  static std::vector<ProjectScopedContainers> test;
+
+  static ProjectScopedContainers
+  MakeNewProjectScopedContainersWithLocalVariables(
+      const ProjectScopedContainers &projectScopedContainers,
+      const gd::BaseEvent &event);
 
   ProjectScopedContainers &AddPropertiesContainer(
       const gd::PropertiesContainer &container) {
@@ -149,6 +157,14 @@ class ProjectScopedContainers {
   };
 
   const gd::VariablesContainersList &GetVariablesContainersList() const {
+    return variablesContainersList;
+  };
+
+  /**
+   * @brief The code generator push variable containers in the same instance
+   * to avoid to pass an instance by parameter.
+   */
+  gd::VariablesContainersList &GetVariablesContainersList() {
     return variablesContainersList;
   };
 

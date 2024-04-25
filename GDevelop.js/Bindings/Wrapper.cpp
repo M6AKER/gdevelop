@@ -36,6 +36,7 @@
 #include <GDCore/IDE/Events/EventsRemover.h>
 #include <GDCore/IDE/Events/EventsTypesLister.h>
 #include <GDCore/IDE/Events/EventsVariablesFinder.h>
+#include <GDCore/IDE/Events/ExpressionVariableTypeFinder.h>
 #include <GDCore/IDE/Events/ExpressionCompletionFinder.h>
 #include <GDCore/IDE/Events/ExpressionNodeLocationFinder.h>
 #include <GDCore/IDE/Events/ExpressionTypeFinder.h>
@@ -57,6 +58,7 @@
 #include <GDCore/IDE/ProjectBrowserHelper.h>
 #include <GDCore/IDE/PropertyFunctionGenerator.h>
 #include <GDCore/IDE/UnfilledRequiredBehaviorPropertyProblem.h>
+#include <GDCore/IDE/VariableInstructionSwitcher.h>
 #include <GDCore/IDE/WholeProjectRefactorer.h>
 #include <GDCore/Project/Behavior.h>
 #include <GDCore/Project/CustomObjectConfiguration.h>
@@ -445,6 +447,7 @@ typedef std::vector<gd::EventsFunction> VectorEventsFunction;
 typedef gd::Object gdObject;  // To avoid clashing javascript Object in glue.js
 typedef ParticleEmitterObject::RendererType ParticleEmitterObject_RendererType;
 typedef EventsFunction::FunctionType EventsFunction_FunctionType;
+typedef ObjectsContainersList::VariableExistence ObjectsContainersList_VariableExistence;
 typedef EventsFunctionsContainer::FunctionOwner
     EventsFunctionsContainer_FunctionOwner;
 typedef std::unique_ptr<gd::Object> UniquePtrObject;
@@ -463,6 +466,7 @@ typedef std::vector<gd::ExpressionCompletionDescription>
 typedef std::map<gd::String, std::map<gd::String, gd::PropertyDescriptor>>
     MapExtensionProperties;
 typedef gd::Variable::Type Variable_Type;
+typedef gd::VariablesContainer::SourceType VariablesContainer_SourceType;
 typedef std::map<gd::String, gd::SerializerValue> MapStringSerializerValue;
 typedef std::vector<std::pair<gd::String, std::shared_ptr<SerializerElement>>>
     VectorPairStringSharedPtrSerializerElement;
@@ -564,10 +568,14 @@ typedef ExtensionAndMetadata<ExpressionMetadata> ExtensionAndExpressionMetadata;
   MakeNewObjectsContainersListForProjectAndLayout
 #define STATIC_MakeNewObjectsContainersListForContainers \
   MakeNewObjectsContainersListForContainers
+#define STATIC_MakeNewEmptyProjectScopedContainers \
+  MakeNewEmptyProjectScopedContainers
 #define STATIC_MakeNewProjectScopedContainersForProjectAndLayout \
   MakeNewProjectScopedContainersForProjectAndLayout
 #define STATIC_MakeNewProjectScopedContainersFor \
   MakeNewProjectScopedContainersFor
+#define STATIC_MakeNewProjectScopedContainersWithLocalVariables \
+  MakeNewProjectScopedContainersWithLocalVariables
 
 #define STATIC_GetExtensionAndBehaviorMetadata GetExtensionAndBehaviorMetadata
 #define STATIC_GetExtensionAndObjectMetadata GetExtensionAndObjectMetadata
@@ -666,6 +674,15 @@ typedef ExtensionAndMetadata<ExpressionMetadata> ExtensionAndExpressionMetadata;
 #define STATIC_FindAllLayoutVariables FindAllLayoutVariables
 #define STATIC_FindAllObjectVariables FindAllObjectVariables
 #define STATIC_FindAllIdentifierExpressions FindAllIdentifierExpressions
+#define STATIC_SwitchVariableInstructionType SwitchVariableInstructionType
+#define STATIC_GetVariableTypeFromParameters GetVariableTypeFromParameters
+#define STATIC_SwitchBetweenUnifiedInstructionIfNeeded SwitchBetweenUnifiedInstructionIfNeeded
+#define STATIC_IsSwitchableVariableInstruction IsSwitchableVariableInstruction
+#define STATIC_IsSwitchableObjectVariableInstruction IsSwitchableObjectVariableInstruction
+#define STATIC_GetSwitchableVariableInstructionIdentifier GetSwitchableVariableInstructionIdentifier
+#define STATIC_GetSwitchableInstructionVariableType GetSwitchableInstructionVariableType
+#define STATIC_GetVariableType GetVariableType
+#define STATIC_GetArrayVariableType GetArrayVariableType
 
 #define STATIC_IsFreeFunctionOnlyCallingItself IsFreeFunctionOnlyCallingItself
 #define STATIC_IsBehaviorFunctionOnlyCallingItself \

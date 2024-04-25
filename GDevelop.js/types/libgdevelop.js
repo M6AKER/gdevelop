@@ -65,7 +65,10 @@ declare class libGDevelop {
   JsPlatform: Class<gdJsPlatform>;
   PairStringVariable: Class<gdPairStringVariable>;
   Variable_Type: Class<Variable_Type>;
+  VariableInstructionSwitcher: Class<gdVariableInstructionSwitcher>;
+  ExpressionVariableTypeFinder: Class<gdExpressionVariableTypeFinder>;
   Variable: Class<gdVariable>;
+  VariablesContainer_SourceType: Class<VariablesContainer_SourceType>;
   VariablesContainer: Class<gdVariablesContainer>;
   VariablesContainersList: Class<gdVariablesContainersList>;
   ObjectGroup: Class<gdObjectGroup>;
@@ -76,6 +79,7 @@ declare class libGDevelop {
   ObjectFolderOrObject: Class<gdObjectFolderOrObject>;
   ObjectsContainer: Class<gdObjectsContainer>;
   Project: Class<gdProject>;
+  ObjectsContainersList_VariableExistence: Class<ObjectsContainersList_VariableExistence>;
   ObjectsContainersList: Class<gdObjectsContainersList>;
   ProjectScopedContainers: Class<gdProjectScopedContainers>;
   ExtensionProperties: Class<gdExtensionProperties>;

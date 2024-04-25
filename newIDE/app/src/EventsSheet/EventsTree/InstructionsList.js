@@ -17,7 +17,10 @@ import { makeDropTarget } from '../../UI/DragAndDrop/DropTarget';
 import { type ScreenType } from '../../UI/Responsive/ScreenTypeMeasurer';
 import { type WindowSizeType } from '../../UI/Responsive/ResponsiveWindowMeasurer';
 import { useLongTouch } from '../../Utils/UseLongTouch';
-import { type EventsScope } from '../../InstructionOrExpression/EventsScope.flow';
+import {
+  type EventsScope,
+  ProjectScopedContainers,
+} from '../../InstructionOrExpression/EventsScope.flow';
 
 const styles = {
   addButton: {
@@ -61,6 +64,7 @@ type Props = {|
   resourcesManager: gdResourcesManager,
   globalObjectsContainer: gdObjectsContainer,
   objectsContainer: gdObjectsContainer,
+  projectScopedContainers: ProjectScopedContainers,
 
   idPrefix: string,
 |};
@@ -98,6 +102,7 @@ export default function InstructionsList({
   resourcesManager,
   globalObjectsContainer,
   objectsContainer,
+  projectScopedContainers,
   idPrefix,
 }: Props) {
   const [canPaste, setCanPaste] = React.useState(false);
@@ -173,6 +178,7 @@ export default function InstructionsList({
         resourcesManager={resourcesManager}
         globalObjectsContainer={globalObjectsContainer}
         objectsContainer={objectsContainer}
+        projectScopedContainers={projectScopedContainers}
         id={`${idPrefix}-${areConditions ? 'condition' : 'action'}-${i}`}
       />
     );

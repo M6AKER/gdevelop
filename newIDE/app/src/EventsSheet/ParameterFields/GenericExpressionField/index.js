@@ -48,7 +48,8 @@ import {
   shouldValidate,
 } from '../../../UI/KeyboardShortcuts/InteractionKeys';
 import Paper from '../../../UI/Paper';
-import { getProjectScopedContainersFromScope } from '../../../InstructionOrExpression/EventsScope.flow';
+import { ProjectScopedContainers } from '../../../InstructionOrExpression/EventsScope.flow';
+
 const gd: libGDevelop = global.gd;
 
 const styles = {
@@ -126,7 +127,7 @@ const MAX_ERRORS_COUNT = 10;
 const extractErrors = (
   platform: gdPlatform,
   project: gdProject,
-  projectScopedContainers: gdProjectScopedContainers,
+  projectScopedContainers: ProjectScopedContainers,
   expressionType: string,
   expressionNode: gdExpressionNode
 ): {|
@@ -135,7 +136,7 @@ const extractErrors = (
 |} => {
   const expressionValidator = new gd.ExpressionValidator(
     gd.JsPlatform.get(),
-    projectScopedContainers,
+    projectScopedContainers.get(),
     expressionType
   );
   expressionNode.visit(expressionValidator);
@@ -279,13 +280,7 @@ export default class ExpressionField extends React.Component<Props, State> {
     parameterValues: ParameterValues
   ) => {
     if (!this._inputElement) return;
-    const {
-      globalObjectsContainer,
-      objectsContainer,
-      scope,
-      expressionType,
-      value,
-    } = this.props;
+    const { projectScopedContainers, expressionType, value } = this.props;
     const cursorPosition = this._inputElement.selectionStart;
     const parser = new gd.ExpressionParser2();
 
@@ -306,14 +301,9 @@ export default class ExpressionField extends React.Component<Props, State> {
       expressionNode,
       cursorPosition + 'fakeIdentifier'.length - 1
     );
-    const projectScopedContainers = getProjectScopedContainersFromScope(
-      scope,
-      globalObjectsContainer,
-      objectsContainer
-    );
     const type = gd.ExpressionTypeFinder.getType(
       gd.JsPlatform.get(),
-      projectScopedContainers,
+      projectScopedContainers.get(),
       expressionType,
       currentNode
     );
@@ -430,8 +420,7 @@ export default class ExpressionField extends React.Component<Props, State> {
   _doValidation = () => {
     const {
       project,
-      globalObjectsContainer,
-      objectsContainer,
+      projectScopedContainers,
       expressionType,
       scope,
       onGetAdditionalAutocompletions,
@@ -446,12 +435,6 @@ export default class ExpressionField extends React.Component<Props, State> {
 
     const parser = new gd.ExpressionParser2();
     const expressionNode = parser.parseExpression(expression).get();
-
-    const projectScopedContainers = getProjectScopedContainersFromScope(
-      scope,
-      globalObjectsContainer,
-      objectsContainer
-    );
 
     const { errorText, errorHighlights } = extractErrors(
       gd.JsPlatform.get(),
@@ -486,7 +469,7 @@ export default class ExpressionField extends React.Component<Props, State> {
       : 0;
     const completionDescriptions = gd.ExpressionCompletionFinder.getCompletionDescriptionsFor(
       gd.JsPlatform.get(),
-      projectScopedContainers,
+      projectScopedContainers.get(),
       expressionType,
       expressionNode,
       cursorPosition - 1

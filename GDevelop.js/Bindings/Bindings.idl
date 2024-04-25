@@ -135,7 +135,7 @@ interface EventsVariablesFinder {
 
     [Const, Value] SetString STATIC_FindAllGlobalVariables([Const, Ref] Platform platform, [Const, Ref] Project project);
     [Const, Value] SetString STATIC_FindAllLayoutVariables([Const, Ref] Platform platform, [Const, Ref] Project project, [Const, Ref] Layout layout);
-    [Const, Value] SetString STATIC_FindAllObjectVariables([Const, Ref] Platform platform, [Const, Ref] Project project, [Const, Ref] Layout layout, [Const, Ref] gdObject obj);
+    [Const, Value] SetString STATIC_FindAllObjectVariables([Const, Ref] Platform platform, [Const, Ref] Project project, [Const, Ref] Layout layout, [Const] DOMString objectName);
 
     //Inherited from ExpressionParser2NodeWorker:
 };
@@ -225,11 +225,42 @@ interface PairStringVariable {
 };
 
 enum Variable_Type {
+    "Variable::Unknown",
     "Variable::String",
     "Variable::Number",
     "Variable::Boolean",
     "Variable::Structure",
     "Variable::Array"
+};
+
+interface VariableInstructionSwitcher {
+    boolean STATIC_IsSwitchableVariableInstruction([Const] DOMString instructionType);
+    boolean STATIC_IsSwitchableObjectVariableInstruction([Const] DOMString instructionType);
+    [Const, Ref] DOMString STATIC_GetSwitchableVariableInstructionIdentifier([Const] DOMString instructionType);
+    [Const] Variable_Type STATIC_GetSwitchableInstructionVariableType([Const] DOMString instructionType);
+    void STATIC_SwitchVariableInstructionType(
+    [Ref] Instruction instruction, [Const] Variable_Type variableType);
+    [Const] Variable_Type STATIC_GetVariableTypeFromParameters(
+        [Const, Ref] Platform platform,
+        [Const, Ref] ProjectScopedContainers projectScopedContainers,
+        [Const, Ref] Instruction instruction);
+    void STATIC_SwitchBetweenUnifiedInstructionIfNeeded(
+        [Const, Ref] Platform platform,
+        [Const, Ref] ProjectScopedContainers projectScopedContainers,
+        [Ref] Instruction instruction);
+};
+
+interface ExpressionVariableTypeFinder {
+    [Const] Variable_Type STATIC_GetVariableType(
+      [Const, Ref] Platform platform,
+      [Const, Ref] ProjectScopedContainers projectScopedContainers,
+      [Ref] ExpressionNode node,
+      [Const] DOMString objectName);
+    [Const] Variable_Type STATIC_GetArrayVariableType(
+      [Const, Ref] Platform platform,
+      [Const, Ref] ProjectScopedContainers projectScopedContainers,
+      [Ref] ExpressionNode node,
+      [Const] DOMString objectName);
 };
 
 interface Variable {
@@ -273,8 +304,19 @@ interface Variable {
     [Ref] Variable ClearPersistentUuid();
 };
 
+enum VariablesContainer_SourceType {
+  "VariablesContainer::Unknown",
+  "VariablesContainer::Global",
+  "VariablesContainer::Scene",
+  "VariablesContainer::Object",
+  "VariablesContainer::Local"
+};
+
 interface VariablesContainer {
     void VariablesContainer();
+    void VariablesContainer(VariablesContainer_SourceType sourceType);
+
+    VariablesContainer_SourceType GetSourceType();
 
     boolean Has([Const] DOMString name);
     [Ref] Variable Get([Const] DOMString name);
@@ -302,6 +344,12 @@ interface VariablesContainersList {
         [Const, Ref] Project project,
         [Const, Ref] Layout layout);
   [Value] VariablesContainersList STATIC_MakeNewEmptyVariablesContainersList();
+  boolean Has([Const] DOMString name);
+  [Const, Ref] Variable Get([Const] DOMString name);
+  [Const, Ref] VariablesContainer GetVariablesContainerFromVariableName([Const] DOMString variableName);
+
+  [Const, Ref] VariablesContainer GetVariablesContainer(unsigned long index);
+  unsigned long GetVariablesContainersCount();
 };
 
 interface ObjectGroup {
@@ -588,6 +636,13 @@ interface Project {
     [Ref] ObjectGroupsContainer GetObjectGroups();
 };
 
+enum ObjectsContainersList_VariableExistence {
+    "ObjectsContainersList::DoesNotExist",
+    "ObjectsContainersList::Exists",
+    "ObjectsContainersList::GroupIsEmpty",
+    "ObjectsContainersList::ExistsOnlyOnSomeObjectsOfTheGroup"
+};
+
 interface ObjectsContainersList {
   [Value] ObjectsContainersList STATIC_MakeNewObjectsContainersListForProjectAndLayout(
         [Const, Ref] Project project,
@@ -600,6 +655,8 @@ interface ObjectsContainersList {
   [Const, Value] DOMString GetTypeOfBehavior([Const] DOMString name, boolean searchInGroups);
   [Value] VectorString GetBehaviorsOfObject([Const] DOMString name, boolean searchInGroups);
   [Const, Value] DOMString GetTypeOfBehaviorInObjectOrGroup([Const] DOMString objectOrGroupName, [Const] DOMString behaviorName, boolean searchInGroups);
+
+  ObjectsContainersList_VariableExistence HasObjectOrGroupWithVariableNamed([Const] DOMString objectName, [Const] DOMString variableName);
 };
 
 interface ProjectScopedContainers {
@@ -609,6 +666,9 @@ interface ProjectScopedContainers {
   [Value] ProjectScopedContainers STATIC_MakeNewProjectScopedContainersFor(
         [Const, Ref] ObjectsContainer globalObjectsContainer,
         [Const, Ref] ObjectsContainer objectsContainer);
+  [Value] ProjectScopedContainers STATIC_MakeNewProjectScopedContainersWithLocalVariables(
+        [Const, Ref] ProjectScopedContainers projectScopedContainers,
+        [Const, Ref] BaseEvent event);
 
   [Ref] ProjectScopedContainers AddPropertiesContainer(
         [Const, Ref] PropertiesContainer propertiesContainer);
@@ -2054,9 +2114,15 @@ interface BaseEvent {
     [Const, Ref] DOMString GetType();
     void SetType([Const] DOMString type);
     boolean IsExecutable();
+
     boolean CanHaveSubEvents();
     boolean HasSubEvents();
     [Ref] EventsList GetSubEvents();
+
+    boolean CanHaveVariables();
+    boolean HasVariables();
+    [Ref] VariablesContainer GetVariables();
+
     boolean IsDisabled();
     void SetDisabled(boolean disable);
     boolean IsFolded();
@@ -2071,23 +2137,8 @@ interface StandardEvent {
 
     [Ref] InstructionsList GetConditions();
     [Ref] InstructionsList GetActions();
-
-    //Inherited from BaseEvent:
-    StandardEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+StandardEvent implements BaseEvent;
 
 interface RepeatEvent {
     void RepeatEvent();
@@ -2096,23 +2147,8 @@ interface RepeatEvent {
     [Ref] InstructionsList GetActions();
     void SetRepeatExpression([Const] DOMString expr);
     [Const, Ref] DOMString GetRepeatExpression();
-
-    //Inherited from BaseEvent:
-    RepeatEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+RepeatEvent implements BaseEvent;
 
 interface WhileEvent {
     void WhileEvent();
@@ -2120,23 +2156,8 @@ interface WhileEvent {
     [Ref] InstructionsList GetConditions();
     [Ref] InstructionsList GetWhileConditions();
     [Ref] InstructionsList GetActions();
-
-    //Inherited from BaseEvent:
-    WhileEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+WhileEvent implements BaseEvent;
 
 interface ForEachEvent {
     void ForEachEvent();
@@ -2145,23 +2166,8 @@ interface ForEachEvent {
     [Const, Ref] DOMString GetObjectToPick();
     [Ref] InstructionsList GetConditions();
     [Ref] InstructionsList GetActions();
-
-    //Inherited from BaseEvent:
-    ForEachEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+ForEachEvent implements BaseEvent;
 
 interface ForEachChildVariableEvent {
     void ForEachChildVariableEvent();
@@ -2175,23 +2181,8 @@ interface ForEachChildVariableEvent {
     void SetIterableVariableName([Const] DOMString newName);
     void SetKeyIteratorVariableName([Const] DOMString newName);
     void SetValueIteratorVariableName([Const] DOMString newName);
-
-    //Inherited from BaseEvent:
-    ForEachChildVariableEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+ForEachChildVariableEvent implements BaseEvent;
 
 interface CommentEvent {
     void CommentEvent();
@@ -2208,23 +2199,8 @@ interface CommentEvent {
     unsigned long GetTextColorRed();
     unsigned long GetTextColorGreen();
     unsigned long GetTextColorBlue();
-
-    //Inherited from BaseEvent:
-    CommentEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+CommentEvent implements BaseEvent;
 
 interface GroupEvent {
     void GroupEvent();
@@ -2240,23 +2216,8 @@ interface GroupEvent {
     [Ref] VectorString GetCreationParameters();
     unsigned long GetCreationTimestamp();
     void SetCreationTimestamp(unsigned long ts);
-
-    //Inherited from BaseEvent:
-    GroupEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+GroupEvent implements BaseEvent;
 
 interface LinkEvent {
     void LinkEvent();
@@ -2271,23 +2232,8 @@ interface LinkEvent {
     void SetIncludeStartAndEnd(unsigned long start, unsigned long end);
     unsigned long GetIncludeStart();
     unsigned long GetIncludeEnd();
-
-    //Inherited from BaseEvent:
-    LinkEvent Clone();
-    [Const, Ref] DOMString GetType();
-    void SetType([Const] DOMString type);
-    boolean IsExecutable();
-    boolean CanHaveSubEvents();
-    boolean HasSubEvents();
-    [Ref] EventsList GetSubEvents();
-    boolean IsDisabled();
-    void SetDisabled(boolean disable);
-    boolean IsFolded();
-    void SetFolded(boolean folded);
-
-    void SerializeTo([Ref] SerializerElement element);
-    void UnserializeFrom([Ref] Project project, [Const, Ref] SerializerElement element);
 };
+LinkEvent implements BaseEvent;
 
 interface EventsRemover {
     void EventsRemover();

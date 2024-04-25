@@ -254,12 +254,12 @@ gd::String EventsCodeGenerator::GenerateMutatorCall(
   }
 
   gd::String operatorStr = arguments[operatorIndex];
-  if (operatorStr.size() > 2)
+  if (operatorStr.size() > 2 && operatorStr[0] == '\"') {
     operatorStr = operatorStr.substr(
         1,
         operatorStr.length() - 1 -
             1);  // Operator contains quote which must be removed.
-
+  }
   auto mutators = instrInfos.codeExtraInformation.optionalMutators;
   auto mutator = mutators.find(operatorStr);
   if (mutator == mutators.end()) {
@@ -278,6 +278,9 @@ gd::String EventsCodeGenerator::GenerateMutatorCall(
       if (!argumentsStr.empty()) argumentsStr += ", ";
       argumentsStr += arguments[i];
     }
+  }
+  if (instrInfos.GetManipulatedType() == "boolean") {
+    return callStartString + "(" + argumentsStr + ")." + mutator->second;
   }
 
   return callStartString + "(" + argumentsStr + ")." + mutator->second + "(" +
@@ -607,14 +610,22 @@ EventsCodeGenerator::GenerateCallback(
     actionsCode += "} //End of subevents\n";
   }
 
+  gd::String restoreLocalVariablesCode;
+  if (HasProjectAndLayout()) {
+    restoreLocalVariablesCode +=
+        "asyncObjectsList.restoreLocalVariablesContainers(" +
+        GetCodeNamespace() + ".localVariables);\n";
+  }
+
   // Compose the callback function and add outside main
   const gd::String actionsDeclarationsCode =
       GenerateObjectsDeclarationCode(callbackContext);
 
-  const gd::String callbackCode = callbackFunctionName + " = function (" +
-                                  GenerateEventsParameters(callbackContext) +
-                                  ") {\n" + actionsDeclarationsCode +
-                                  actionsCode + "}\n";
+  const gd::String callbackCode =
+      callbackFunctionName + " = function (" +
+      GenerateEventsParameters(callbackContext) + ") {\n" +
+      restoreLocalVariablesCode +
+      actionsDeclarationsCode + actionsCode + "}\n";
 
   AddCustomCodeOutsideMain(callbackCode);
 
@@ -695,7 +706,8 @@ gd::String EventsCodeGenerator::GenerateParameterCodes(
   } else if (metadata.GetType() == "operator") {
     argOutput += parameter.GetPlainString();
     if (argOutput != "=" && argOutput != "+" && argOutput != "-" &&
-        argOutput != "/" && argOutput != "*") {
+        argOutput != "/" && argOutput != "*" && argOutput != "True" &&
+        argOutput != "False" && argOutput != "Toggle") {
       cout << "Warning: Bad operator: Set to = by default." << endl;
       argOutput = "=";
     }
@@ -865,6 +877,11 @@ gd::String EventsCodeGenerator::GenerateEventsListCode(
     gd::EventsList& events, EventsCodeGenerationContext& parentContext) {
   gd::String output;
   for (std::size_t eId = 0; eId < events.size(); ++eId) {
+    auto& event = events[eId];
+    if (event.HasVariables()) {
+      GetProjectScopedContainers().GetVariablesContainersList().Push(event.GetVariables());
+    }
+
     // Each event has its own context : Objects picked in an event are totally
     // different than the one picked in another.
     gd::EventsCodeGenerationContext newContext;
@@ -885,13 +902,17 @@ gd::String EventsCodeGenerator::GenerateEventsListCode(
 
     auto& context = reuseParentContext ? reusedContext : newContext;
 
-    gd::String eventCoreCode = events[eId].GenerateEventCode(*this, context);
+    gd::String eventCoreCode = event.GenerateEventCode(*this, context);
     gd::String scopeBegin = GenerateScopeBegin(context);
     gd::String scopeEnd = GenerateScopeEnd(context);
     gd::String declarationsCode = GenerateObjectsDeclarationCode(context);
 
     output += "\n" + scopeBegin + "\n" + declarationsCode + "\n" +
               eventCoreCode + "\n" + scopeEnd + "\n";
+    
+    if (event.HasVariables()) {
+      GetProjectScopedContainers().GetVariablesContainersList().Pop();
+    }
   }
 
   return output;
@@ -1067,7 +1088,8 @@ gd::String EventsCodeGenerator::GenerateFreeAction(
   // Generate call
   gd::String call;
   if (instrInfos.codeExtraInformation.type == "number" ||
-      instrInfos.codeExtraInformation.type == "string") {
+      instrInfos.codeExtraInformation.type == "string" || 
+      instrInfos.codeExtraInformation.type == "boolean") {
     if (instrInfos.codeExtraInformation.accessType ==
         gd::InstructionMetadata::ExtraInformation::MutatorAndOrAccessor)
       call = GenerateOperatorCall(

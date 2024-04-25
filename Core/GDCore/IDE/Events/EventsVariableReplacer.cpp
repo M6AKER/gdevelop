@@ -20,6 +20,7 @@
 #include "GDCore/Extensions/Metadata/ParameterMetadataTools.h"
 #include "GDCore/IDE/Events/ExpressionValidator.h"
 #include "GDCore/IDE/Events/ExpressionVariableOwnerFinder.h"
+#include "GDCore/IDE/VariableInstructionSwitcher.h"
 #include "GDCore/Project/Layout.h"
 #include "GDCore/Project/Project.h"
 #include "GDCore/Project/ProjectScopedContainers.h"
@@ -104,7 +105,7 @@ class GD_CORE_API ExpressionVariableReplacer
         [&]() {
           // This is a variable.
           if (projectScopedContainers.GetVariablesContainersList()
-                  .HasVariablesContainer(targetVariablesContainer)) {
+                   .HasVariablesContainer(targetVariablesContainer)) {
             // The node represents a variable, that can come from the target
             // (because the target is in the scope), replace or remove it:
             RenameOrRemoveVariableOfTargetVariableContainer(node.name);
@@ -123,7 +124,7 @@ class GD_CORE_API ExpressionVariableReplacer
         [&]() {
           // This is something else - potentially a deleted variable.
           if (projectScopedContainers.GetVariablesContainersList()
-                  .HasVariablesContainer(targetVariablesContainer)) {
+                   .HasVariablesContainer(targetVariablesContainer)) {
             // The node represents a variable, that can come from the target
             // (because the target is in the scope), replace or remove it:
             RenameOrRemoveVariableOfTargetVariableContainer(node.name);
@@ -188,7 +189,7 @@ class GD_CORE_API ExpressionVariableReplacer
         [&]() {
           // This is a variable.
           if (projectScopedContainers.GetVariablesContainersList()
-                  .HasVariablesContainer(targetVariablesContainer)) {
+                   .HasVariablesContainer(targetVariablesContainer)) {
             // The node represents a variable, that can come from the target
             // (because the target is in the scope), replace or remove it:
             RenameOrRemoveVariableOfTargetVariableContainer(
@@ -204,7 +205,7 @@ class GD_CORE_API ExpressionVariableReplacer
         [&]() {
           // This is something else - potentially a deleted variable.
           if (projectScopedContainers.GetVariablesContainersList()
-                  .HasVariablesContainer(targetVariablesContainer)) {
+                   .HasVariablesContainer(targetVariablesContainer)) {
             // The node represents a variable, that can come from the target
             // (because the target is in the scope), replace or remove it:
             RenameOrRemoveVariableOfTargetVariableContainer(
@@ -362,6 +363,16 @@ bool EventsVariableReplacer::DoVisitInstruction(gd::Instruction& instruction,
           } else if (renamer.HasDoneRenaming()) {
             instruction.SetParameter(
                 parameterIndex, ExpressionParser2NodePrinter::PrintNode(*node));
+          }
+        }
+
+        if (gd::ParameterMetadata::IsExpression("variable", type)) {
+          const auto &variableName = instruction.GetParameter(parameterIndex).GetPlainString();
+          auto itr = variableNewTypes.find(variableName);
+          if (itr != variableNewTypes.end()) {
+            const gd::Variable::Type variableType = itr->second;
+            gd::VariableInstructionSwitcher::SwitchVariableInstructionType(
+                instruction, variableType);
           }
         }
       });

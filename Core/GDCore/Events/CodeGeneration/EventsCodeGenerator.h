@@ -337,6 +337,14 @@ class GD_CORE_API EventsCodeGenerator {
   }
 
   /**
+   * @brief The code generator push variable containers in the same instance
+   * to avoid to pass an instance by parameter.
+   */
+  gd::ProjectScopedContainers& GetProjectScopedContainers() {
+    return projectScopedContainers;
+  }
+
+  /**
    * \brief Return true if the code generation is done for a given project and
    * layout. If not, this means that the code is generated for a function.
    */
@@ -448,7 +456,7 @@ class GD_CORE_API EventsCodeGenerator {
    */
   virtual gd::String GetCodeNamespace() { return ""; };
 
-  enum VariableScope { LAYOUT_VARIABLE = 0, PROJECT_VARIABLE, OBJECT_VARIABLE };
+  enum VariableScope { LAYOUT_VARIABLE = 0, PROJECT_VARIABLE, OBJECT_VARIABLE, ANY_VARIABLE };
 
   /**
    * Generate a single unique number for the specified instruction.
@@ -534,11 +542,15 @@ class GD_CORE_API EventsCodeGenerator {
       const VariableScope& scope,
       gd::EventsCodeGenerationContext& context,
       const gd::String& objectName) {
+    // This code is only used as a mock.
+    // See the real implementation in GDJS.
     if (scope == LAYOUT_VARIABLE) {
       return "getLayoutVariable(" + variableName + ")";
 
     } else if (scope == PROJECT_VARIABLE) {
       return "getProjectVariable(" + variableName + ")";
+    } else if (scope == ANY_VARIABLE) {
+      return "getAnyVariable(" + variableName + ")";
     }
 
     return "getVariableForObject(" + objectName + ", " + variableName + ")";

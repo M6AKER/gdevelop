@@ -166,8 +166,7 @@ bool ExpressionValidator::ValidateObjectVariableOrVariableOrProperty(
         return true; // We found a property, even if the child is not allowed.
       }
 
-      const gd::NamedPropertyDescriptor& property = projectScopedContainers
-          .GetPropertiesContainersList().Get(identifier.identifierName).second;
+      const gd::NamedPropertyDescriptor& property = propertiesContainersList.Get(identifier.identifierName).second;
 
       if (property.GetType() == "Number") {
        childType = Type::Number;
@@ -440,6 +439,10 @@ const gd::String& ExpressionValidator::TypeToString(Type type) {
       return numberOrStringTypeString;
     case Type::Variable:
       return variableTypeString;
+    case Type::LegacyVariable:
+      // This function is only used to display error.
+      // Users don't care if it's legacy or not.
+      return variableTypeString;
     case Type::Object:
       return objectTypeString;
     case Type::Empty:
@@ -466,7 +469,12 @@ ExpressionValidator::Type ExpressionValidator::StringToType(
   if (type == ExpressionValidator::variableTypeString ||
       gd::ParameterMetadata::IsExpression(
           ExpressionValidator::variableTypeString, type)) {
-    return Type::Variable;
+    if (gd::ValueTypeMetadata::IsTypeLegacyPreScopedVariable(type)) {
+      return Type::LegacyVariable;
+    }
+    else {
+      return Type::Variable;
+    }
   }
   if (type == ExpressionValidator::objectTypeString ||
       gd::ParameterMetadata::IsObject(type)) {
